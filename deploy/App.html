@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>S484983-MilestonePlanningReport</title>
+
+    <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
+
+    <script type="text/javascript">
+        Rally.onReady(function () {
+                Ext.define("CustomApp",{extend:"Rally.app.App",componentCls:"app",requires:["Rally.ui.gridboard.plugin.GridBoardCustomFilterControl"],_cardBoard:void 0,_filters:void 0,_types:["PortfolioItem/Feature"],_initDate:void 0,_endDate:void 0,items:[{xtype:"container",itemId:"header",cls:"header"},{xtype:"container",itemId:"bodyContainer",height:"90%",width:"100%",autoScroll:!0}],launch:function(){var e=this.getContext().getProject().ObjectID;this.projectId=e,this._milestoneComboStore=void 0,console.log("project:",e),this._milestoneCombo=Ext.widget("rallymilestonecombobox",{itemId:"milestonecombobox",allowClear:!0,width:300,listeners:{change:function(e){e.value&&(this._setFilter(e.value),this._buildSummaryBoard(e.value))},ready:function(e){},scope:this}}),this._milestoneComboStore=this._milestoneCombo.getStore(),this.down("#header").add([{xtype:"panel",autoWidth:!0,height:120,layout:"hbox",items:[{xtype:"panel",title:"Choose date range for milestone:",flex:3,align:"stretch",autoHeight:!0,bodyPadding:10,items:[{xtype:"datefield",anchor:"100%",fieldLabel:"From",scope:this,listeners:{change:function(e,t,i){this._initDate=t;this._applyMilestoneRangeFilter(this._initDate,this._endDate,this._milestoneComboStore,this)},scope:this}},{xtype:"datefield",anchor:"100%",fieldLabel:"To",scope:this,listeners:{change:function(e,t,i){this._endDate=t;this._applyMilestoneRangeFilter(this._initDate,this._endDate,this._milestoneComboStore,this)},scope:this}}]},{xtype:"panel",title:"Summary",itemId:"summaryPanel",bodyPadding:10,flex:7,align:"stretch",autoHeight:!0}]},{xtype:"fieldcontainer",fieldLabel:"Milestone",pack:"end",labelAlign:"right",items:[this._milestoneCombo]}])},_applyMilestoneRangeFilter:function(e,t,i,o){e&&!t?this._milestoneComboStore.filterBy(function(t){if(t.get("TargetDate")&&t.get("TargetDate").getTime()>e.getTime())return t},o):t&&!e?this._milestoneComboStore.filterBy(function(e){if(e.get("TargetDate")&&e.get("TargetDate").getTime()<t.getTime())return e},o):e&&t?this._milestoneComboStore.filterBy(function(i){if(i.get("TargetDate")&&i.get("TargetDate").getTime()>e.getTime()&&i.get("TargetDate").getTime()<t.getTime())return i},o):this._milestoneComboStore.filterBy(function(e){return e})},_setFilter:function(e){this._filters=[{property:"Milestones",operator:"contains",value:e}],this._buildBoard()},_buildBoard:function(){if(void 0!==this._filters){this.setLoading(),void 0!==this._cardBoard&&this.down("#bodyContainer").remove(this._cardBoard);var e=this.getContext();this._cardBoard=Ext.widget("rallygridboard",{types:this._types,itemId:"cardboard",name:"cardboard",context:e,toggleState:"board",stateful:!1,listeners:{load:function(e,t){console.log("Board",e),this.setLoading(!1)},scope:this},storeConfig:{filters:this._filters},cardBoardConfig:{attribute:"State",columnConfig:{columnStatusConfig:{pointField:"PreliminaryEstimateValue"},fields:this._getDefaultFields()},rowConfig:{field:"Project"}},plugins:[{ptype:"rallygridboardinlinefiltercontrol",inlineFilterButtonConfig:{margin:"3 9 3 30",stateful:!0,stateId:e.getScopedStateId("filters"),modelNames:["PortfolioItem/Feature"],inlineFilterPanelConfig:{quickFilterPanelConfig:{defaultFields:["ArtifactSearch","Owner","State"]}}}}]}),this.down("#bodyContainer").add(this._cardBoard)}},_buildSummaryBoard:function(e){Ext.create("Rally.data.wsapi.artifact.Store",{context:{projectScopeUp:!1,projectScopeDown:!0,project:null},models:["PortfolioItem/Feature"],fetch:["FormattedID","Name","ObjectID","Project","State","Type","LeafStoryPlanEstimateTotal","PercentDoneByStoryCount","PercentDoneByStoryPlanEstimate"],filters:[{property:"Milestones",operator:"contains",value:e}],limit:1/0}).load().then({success:function(e){var t=new Ext.util.MixedCollection,i=[],o=[],a={ProjectName:"LeafStoryPlanEstimateTotal"};_.each(e,function(e){var i=e.get("Project").Name;if(t.containsKey(i)){var o=t.get(i);o+=e.get("LeafStoryPlanEstimateTotal"),t.replace(i,o)}else{var a=e.get("LeafStoryPlanEstimateTotal");t.add(i,a)}}),t.eachKey(function(e,t){i.push({text:e,dataIndex:e}),o.push(e),a[e]=t});var n=Ext.create("Ext.grid.Panel",{columns:i,flex:1,store:{fields:o,data:a}});this.down("#summaryPanel").removeAll(!0),this.down("#summaryPanel").add(n)},scope:this})},_getDefaultFields:function(){return["Discussion","PreliminaryEstimate","UserStories","Milestones"]}});
+
+            Rally.launchApp('CustomApp', {
+                name:"S484983-MilestonePlanningReport",
+                parentRepos:"",
+                version:"0.1.1"
+            });
+
+        });
+    </script>
+
+
+    <style type="text/css">
+        
+    </style>
+</head>
+<body>
+</body>
+</html>
