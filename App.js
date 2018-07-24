@@ -21,6 +21,9 @@ Ext.define('CustomApp', {
         {
             xtype:'container',
             itemId:'bodyContainer',
+            layout: {
+		        type: 'hbox'
+		    },
             height:'90%',
             width:'100%',
             autoScroll:true
@@ -38,15 +41,30 @@ Ext.define('CustomApp', {
 		this._milestoneCombo = Ext.widget('rallymilestonecombobox', {
 			itemId: 'milestonecombobox',
 			allowClear: true,
+			multiSelect: true,
 			width: 300,
 			listeners: {
 				change: function(combo) {
-					//console.log('change: ', combo.value);
+					//console.log('change: ', combo);
+					console.log('change: ', combo.getValue());
 					//console.log('store', this._milestoneComboStore);
 
-					if (combo.value) {
-						this._setFilter(combo.value);
-						this._buildSummaryBoard(combo.value);
+					if (combo.getValue() && combo.getValue() != '' && combo.valueModels.length > 0) {						
+						this.setLoading();
+
+						var milestones = combo.valueModels;
+						milestones.sort(
+							function(a, b) {
+								return a.get('TargetDate').getTime() - b.get('TargetDate').getTime();
+							}
+						);
+
+						this.down('#bodyContainer').removeAll(true);
+						for (var m of milestones) {
+							this._buildMilestoneColumn(m);
+						}
+						//this._setFilter(combo.value);
+						this._buildSummaryBoard(milestones);
 					}
 				},
 				ready: function(combo) {
@@ -207,7 +225,7 @@ Ext.define('CustomApp', {
 			
 			listeners: {
 				load: function(board, eOpts) {
-					console.log('Board', board);
+					//console.log('Board', board);
 					this.setLoading(false);
 				},
 				scope: this
@@ -217,10 +235,10 @@ Ext.define('CustomApp', {
 				filters: this._filters
 			},
 			// cardConfig: {
-   //              editable: false,
-   //              fields: this._getDefaultFields(),
-   //              pointField: 'PreliminaryEstimateValue'
-   //          },
+            //              editable: false,
+   			//              fields: this._getDefaultFields(),
+   			//              pointField: 'PreliminaryEstimateValue'
+   			//          },
             // rowConfig: {
             //     field: 'Project'
             // },
@@ -260,7 +278,201 @@ Ext.define('CustomApp', {
 	},
 
 
-	_buildSummaryBoard: function(milestone) {
+	_buildMilestoneColumn: function(milestone) {
+		//console.log('milestone', milestone);
+
+		var targetDate = milestone.get('TargetDate');
+		var milestoneId = milestone.get('ObjectID');
+		var milestoneTag = milestone.get('_ref');
+		var milestoneName = milestone.get('Name');
+
+		var colId = 'milestone-'+milestoneId;
+		var colName = targetDate.toLocaleDateString();
+
+		//console.log(colId, colName);
+
+		var column = Ext.create('Ext.panel.Panel', {
+			title: 'Target Date: '+ colName,
+			width: 320,
+            layout: {
+                type: 'vbox',                
+                padding: 5
+            },
+            padding: 5,
+            itemId: colId
+		});
+
+		var filter = {
+			property: 'Milestones',
+			operator: 'contains',
+			value: milestoneTag
+		};
+
+		var featureStore = Ext.create('Rally.data.wsapi.artifact.Store', {
+			context: {
+		        projectScopeUp: false,
+		        projectScopeDown: true,
+		        project: null //null to search all workspace
+		    },
+			models: ['PortfolioItem/Feature', 'Defect', 'TestSet'],
+			fetch: ['FormattedID', 
+					'Name', 
+					'Owner', 
+					'ObjectID', 
+					'Project', 
+					'State', 
+					'Type', 
+					'PlanEstimate',
+					'PreliminaryEstimateValue',
+					'LeafStoryPlanEstimateTotal', 
+					'PercentDoneByStoryCount', 
+					'PercentDoneByStoryPlanEstimate'],
+			filters: [
+				filter
+			],
+			limit: Infinity
+		});
+
+
+		featureStore.load().then({
+			success: function(records) {
+				//console.log('records', records);
+				var that = this;
+
+				if (records) {
+					var summaryCard = this._buildSummaryCard(milestoneName, records);
+					column.add(summaryCard);
+
+					_.each(records, function(feature) {
+						column.add(that._buildKanbanCard(feature));
+					}, that);
+				}
+
+				this.setLoading(false);
+			},
+			scope: this
+		});
+
+		this.down('#bodyContainer').add(column);		
+	},
+
+
+	_buildSummaryCard: function(milestoneName, records) {
+		var totalFeaturePoints = 0;
+		var totalLeafStoryPoints = 0;
+		var totalDefectsPoints = 0;
+
+		_.each(records, function(feature) {
+			var type = feature.get('_type'); 
+			if (type == 'portfolioitem/feature') {
+				totalFeaturePoints += feature.get('PreliminaryEstimateValue');
+				totalLeafStoryPoints += feature.get('LeafStoryPlanEstimateTotal');
+			} else {
+				totalDefectsPoints += feature.get('PlanEstimate');
+			}
+		});
+
+		var summaryCard = Ext.widget('propertygrid', {
+			title: milestoneName + ' summary:',
+			hideHeaders: true, 
+			nameColumnWidth: 200,
+			padding: '0 0 20 15' ,
+			width: 280,
+			source: {
+                    'Total Feature Pts': totalFeaturePoints,
+                    'Total Leaf Story Pts': totalLeafStoryPoints,
+                    'Total Defect PTs' : totalDefectsPoints
+            },
+		});
+
+		return summaryCard;
+	},
+
+
+	_buildKanbanCard: function(record) {
+		var card = Ext.widget('rallycard', {
+			itemId: record.get('FormattedID'),
+			config: {
+				record: record
+			},
+			fields: [ 
+				'Name',
+				'Owner',
+				'FormattedID',
+				'Tags',
+				'Project',
+				'Parent',
+				'LeafStoryPlanEstimateTotal',
+				'PercentDoneByStoryPlanEstimate'
+			],
+			width: 280,
+			record: record
+		});
+
+		return card;
+	},
+
+
+	//NOT BEING USED RIGHT NOW, but could be used in future stories.
+	_buildSummaryBoard: function(milestones) {
+		var milestonesTag = [];
+		for (var m of milestones) {
+			milestonesTag.push(m.get('_ref'));
+		}
+
+		//console.log('tags', milestonesTag);
+
+		var filter;
+
+		if (milestonesTag.length == 1) {
+			filter = {
+		        property: 'Milestones',
+		        operator: 'contains',
+		        value: milestonesTag[0]
+		    };
+		} else if (milestonesTag.length == 2) {
+			filter = Rally.data.wsapi.Filter.or([
+			    {
+			        property: 'Milestones',
+			        operator: 'contains',
+			        value: milestonesTag[0]
+			    },
+			    {
+			        property: 'Milestones',
+			        operator: 'contains',
+			        value: milestonesTag[1]
+			}]);
+		} else if (milestonesTag.length > 2) {
+			filter = Rally.data.wsapi.Filter.or([
+			    {
+			        property: 'Milestones',
+			        operator: 'contains',
+			        value: milestonesTag[0]
+			    },
+			    {
+			        property: 'Milestones',
+			        operator: 'contains',
+			        value: milestonesTag[1]
+			}]);
+
+			milestonesTag = _.last(milestonesTag, milestonesTag.length - 2);
+			//console.log('after last:', milestonesTag);
+
+			for (var tag of milestonesTag) {
+				filter = Rally.data.wsapi.Filter.or([
+				    filter,
+				    {
+				        property: 'Milestones',
+				        operator: 'contains',
+				        value: tag
+					}]);
+			}
+		}
+
+
+		//console.log('filter: ', filter.toString());
+
+
 		var featureStore = Ext.create('Rally.data.wsapi.artifact.Store', {
 			context: {
 		        projectScopeUp: false,
@@ -268,19 +480,15 @@ Ext.define('CustomApp', {
 		        project: null //null to search all workspace
 		    },
 			models: ['PortfolioItem/Feature'],
-			fetch: ['FormattedID', 'Name', 'ObjectID', 'Project', 'State', 'Type', 'LeafStoryPlanEstimateTotal', 'PercentDoneByStoryCount', 'PercentDoneByStoryPlanEstimate'],
-			filters: [{
-				property: 'Milestones',
-				operator: 'contains',
-				value: milestone
-			}],
+			fetch: ['FormattedID', 'Name', 'ObjectID', 'Project', 'State', 'LeafStoryPlanEstimateTotal'],
+			filters: filter,
 			limit: Infinity
 		});
 
 
 		featureStore.load().then({
 			success: function(records) {
-				//console.log('records:', records);
+				//console.log('milestone records:', records);
 				//generate grid
 
 				var map = new Ext.util.MixedCollection();
