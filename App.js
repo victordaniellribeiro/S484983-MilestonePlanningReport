@@ -64,7 +64,7 @@ Ext.define('CustomApp', {
 							this._buildMilestoneColumn(m);
 						}
 						//this._setFilter(combo.value);
-						this._buildSummaryBoard(milestones);
+						//this._buildSummaryBoard(milestones);
 					}
 				},
 				ready: function(combo) {
@@ -125,19 +125,7 @@ Ext.define('CustomApp', {
 		        		scope:this
 		        	}
 				}]
-			},
-			{
-				xtype: 'panel',
-				title: 'Summary',
-				itemId: 'summaryPanel',
-				bodyPadding: 10,
-				//width: 450
-				//layout: 'fit',
-				flex: 7,
-				align: 'stretch',
-				autoHeight: true
 			}]
-
 		},
 		{
 			xtype: 'fieldcontainer',
