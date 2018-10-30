@@ -11,6 +11,8 @@ Ext.define('CustomApp', {
     _types:['PortfolioItem/Feature'],
     _initDate: undefined,
     _endDate: undefined,
+    _exportData: undefined,
+    _exportButton: undefined,
 
 	items:[
         {
@@ -60,9 +62,33 @@ Ext.define('CustomApp', {
 						);
 
 						this.down('#bodyContainer').removeAll(true);
+
+						this._exportData = new Ext.util.MixedCollection();
+
+						var promises = [];
 						for (var m of milestones) {
-							this._buildMilestoneColumn(m);
+							promises.push(this._buildMilestoneColumn(m));
 						}
+
+
+						Deft.Promise.all(promises).then({
+							success: function(records) {
+								this.setLoading(false);
+
+								var rows = this._convertExportDataToJson(this._exportData);
+
+
+								if (!this._exportButton) {
+									this._exportButton = this._createExportButton(rows);
+						        	this.down('#header').add(this._exportButton);
+								} else {
+									this.down('#header').remove(this._exportButton);
+									this._exportButton = this._createExportButton(rows);
+						        	this.down('#header').add(this._exportButton);
+								}                             
+                            },
+                            scope: this
+						});
 						//this._setFilter(combo.value);
 						//this._buildSummaryBoard(milestones);
 					}
@@ -139,6 +165,33 @@ Ext.define('CustomApp', {
 	},
 
 
+
+	_createExportButton: function(rows) {
+		var button = Ext.create('Rally.ui.Button', {
+        	text: 'Export',
+        	margin: '10 10 10 10',
+        	scope: this,
+        	handler: function() {
+        		var csv = this._convertToCSV(rows);
+        		console.log('converting to csv:', csv);
+
+
+        		//Download the file as CSV
+		        var downloadLink = document.createElement("a");
+		        var blob = new Blob(["\ufeff", csv]);
+		        var url = URL.createObjectURL(blob);
+		        downloadLink.href = url;
+		        downloadLink.download = "report.csv";  //Name the file here
+		        document.body.appendChild(downloadLink);
+		        downloadLink.click();
+		        document.body.removeChild(downloadLink);
+        	}
+        });
+
+		return button;
+	},
+
+
 	_applyMilestoneRangeFilter: function(initDate, endDate, store, scope) {
 		//console.log(initDate, endDate, store, scope);
 		if (initDate && !endDate) {
@@ -176,6 +229,7 @@ Ext.define('CustomApp', {
 	},
 
 
+	//NOT USED
 	_setFilter: function(milestoneId) {
 		this._filters = [{
 			property: 'Milestones',
@@ -187,6 +241,7 @@ Ext.define('CustomApp', {
 	},
 
 
+	//NOT USED
 	_buildBoard: function() {
 		if (this._filters === undefined) {
 			return;
@@ -268,6 +323,7 @@ Ext.define('CustomApp', {
 
 	_buildMilestoneColumn: function(milestone) {
 		//console.log('milestone', milestone);
+		var deferred = Ext.create('Deft.Deferred');
 
 		var targetDate = milestone.get('TargetDate');
 		var milestoneId = milestone.get('ObjectID');
@@ -331,17 +387,47 @@ Ext.define('CustomApp', {
 					var summaryCard = this._buildSummaryCard(milestoneName, records);
 					column.add(summaryCard);
 
+					var featuresArray = [];
+					var exportFeature = {
+						milestoneName: milestoneName, 
+						milestoneId: milestoneId,
+						featuresArray: featuresArray
+					};
+
 					_.each(records, function(feature) {
 						column.add(that._buildKanbanCard(feature));
+
+						var planEstimate;
+						if (feature.get('_type') == 'portfolioitem/feature') {
+							planEstimate = feature.get('LeafStoryPlanEstimateTotal');
+						} else {
+							planEstimate = feature.get('PlanEstimate');
+						}
+
+						var featureExp = {
+							id : feature.get('FormattedID'),
+							description : feature.get('Name'),
+							planEstimate : planEstimate
+						};
+
+						exportFeature.featuresArray.push(featureExp);
+
 					}, that);
+
+					this._exportData.add(milestoneId, exportFeature);
+
+					//console.log(' export:', this._exportData);
 				}
 
-				this.setLoading(false);
+				deferred.resolve();
+				//this.setLoading(false);
 			},
 			scope: this
 		});
 
-		this.down('#bodyContainer').add(column);		
+		this.down('#bodyContainer').add(column);
+
+		return deferred.promise;
 	},
 
 
@@ -530,5 +616,53 @@ Ext.define('CustomApp', {
 
 	_getDefaultFields: function() {
 		return ['Discussion', 'PreliminaryEstimate', 'UserStories', 'Milestones'];
-	}
+	},
+
+
+
+	_convertToCSV: function(objArray) {
+		// console.log('csv entry:', objArray);
+		var fields = Object.keys(objArray[0]);
+
+		var replacer = function(key, value) { return value === null ? '' : value; };
+		var csv = objArray.map(function(row){
+		  return fields.map(function(fieldName) {
+		    return JSON.stringify(row[fieldName], replacer);
+		  }).join(',');
+		});
+
+		csv.unshift(fields.join(',')); // add header column
+
+		//console.log(csv.join('\r\n'));
+
+		return csv.join('\r\n');
+    },
+
+
+    _convertExportDataToJson: function(exportData) {
+    	var data = [];
+
+    	//console.log('converting to export for csv:', exportData);
+
+    	exportData.eachKey(function(milestoneId, milestoneFeatures) {
+            //console.log('item:', milestoneFeatures);
+    		var milestoneName = milestoneFeatures.milestoneName;
+
+    		_.each(milestoneFeatures.featuresArray, function(feature) {
+	    		data.push({
+	    			milestoneName: milestoneName,
+	    			featureNumber: feature.id,
+	    			featureDescription: feature.description,
+	    			planEstimate: feature.planEstimate
+	    		});
+    		}, this);          
+        }, 
+        this);
+
+    	//console.log('convertion complete:', data);
+
+    	return data;
+    }
+
+
 });
