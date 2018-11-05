@@ -11,8 +11,15 @@ Ext.define('CustomApp', {
     _types:['PortfolioItem/Feature'],
     _initDate: undefined,
     _endDate: undefined,
+    _selectedMilestones: undefined,
+    _filterPlannedStartDate: undefined,
+    _filterPlannedEndDate: undefined,
+    _filterParent: undefined,
+    _filterProject: undefined,
     _exportData: undefined,
     _exportButton: undefined,
+
+    _myMask: undefined,
 
 	items:[
         {
@@ -37,7 +44,7 @@ Ext.define('CustomApp', {
 		var context = this.getContext();
 		var project = context.getProject()['ObjectID'];
 		this.projectId = project;
-		this._milestoneComboStore = undefined;
+		this._milestoneComboStore = undefined;		
 
 		console.log('project:', project);
 		this._milestoneCombo = Ext.widget('rallymilestonecombobox', {
@@ -51,9 +58,7 @@ Ext.define('CustomApp', {
 					console.log('change: ', combo.getValue());
 					//console.log('store', this._milestoneComboStore);
 
-					if (combo.getValue() && combo.getValue() != '' && combo.valueModels.length > 0) {						
-						this.setLoading();
-
+					if (combo.getValue() && combo.getValue() != '' && combo.valueModels.length > 0) {
 						var milestones = combo.valueModels;
 						milestones.sort(
 							function(a, b) {
@@ -61,40 +66,23 @@ Ext.define('CustomApp', {
 							}
 						);
 
-						this.down('#bodyContainer').removeAll(true);
+						this._selectedMilestones = milestones;
 
-						this._exportData = new Ext.util.MixedCollection();
-
-						var promises = [];
-						for (var m of milestones) {
-							promises.push(this._buildMilestoneColumn(m));
-						}
-
-
-						Deft.Promise.all(promises).then({
-							success: function(records) {
-								this.setLoading(false);
-
-								var rows = this._convertExportDataToJson(this._exportData);
-
-
-								if (!this._exportButton) {
-									this._exportButton = this._createExportButton(rows);
-						        	this.down('#header').add(this._exportButton);
-								} else {
-									this.down('#header').remove(this._exportButton);
-									this._exportButton = this._createExportButton(rows);
-						        	this.down('#header').add(this._exportButton);
-								}                             
-                            },
-                            scope: this
-						});
-						//this._setFilter(combo.value);
-						//this._buildSummaryBoard(milestones);
+						this._doSearch(milestones);
+					} else {
+						this._applyMilestoneRangeFilter(this._initDate, this._endDate, this._milestoneComboStore, this);
 					}
 				},
+				beforerender: function(combo) {
+					console.log('beforerender: ', combo);
+					this._blockFilters();
+
+					//console.log('store', this._milestoneComboStore);
+					//this._setFilter(combo.value);
+				},
 				ready: function(combo) {
-					//console.log('ready: ', combo.value);
+					console.log('ready: ', combo.value);
+					this._unBlockFilters();
 					//console.log('store', this._milestoneComboStore);
 					//this._setFilter(combo.value);
 				},
@@ -108,7 +96,7 @@ Ext.define('CustomApp', {
 		{
 			xtype: 'panel',
 			autoWidth: true,
-			height: 120,
+			//height: 120,
 			layout: 'hbox',
 
 			items: [{
@@ -150,6 +138,102 @@ Ext.define('CustomApp', {
 		        		},
 		        		scope:this
 		        	}
+				},
+				{
+					xtype: 'rallycheckboxfield',
+					fieldLabel: 'Extra Filters:',
+					itemId: 'extraFilters',
+					listeners : {
+		        		change: function(checkbox, newValue, oldValue) {
+		        			console.log('value check:', newValue);
+
+		        			if (newValue) {
+		        				this._showExtraFilters();
+		        			} else {
+		        				this._hideExtraFilters();
+		        			}
+		        		},
+		        		scope:this
+		        	}
+				},
+				{
+					xtype: 'panel',
+					itemId: 'extraFiltersPanel',
+					layout: 'hbox',
+					hidden: true,
+					align: 'stretch',
+					bodyPadding: 10,
+					items: [{
+						xtype: 'datefield',
+				        fieldLabel: 'Planned Start Date',
+				        margin: '0 15 0 0',
+						scope: this,
+			        	listeners : {
+			        		change: function(picker, newDate, oldDate) {
+			        			this._filterPlannedStartDate = newDate;
+			        			// var that = this;
+
+			        			//console.log('Store:', this._milestoneComboStore);
+			        		},
+			        		scope:this
+			        	}
+					},
+					{
+						xtype: 'datefield',
+				        fieldLabel: 'Planned End Date',
+				        margin: '0 15 0 0',
+						scope: this,
+			        	listeners : {
+			        		change: function(picker, newDate, oldDate) {
+			        			this._filterPlannedEndDate = newDate;
+			        			// var that = this;
+
+			        			//console.log('Store:', this._milestoneComboStore);
+			        		},
+			        		scope:this
+			        	}
+					},
+					{
+				        xtype: 'rallytextfield',
+				        fieldLabel: 'Parent',
+				        margin: '0 15 0 0',
+				        scope: this,
+				        listeners : {
+			        		change: function(textField, newValue, oldValue) {
+			        			this._filterParent = newValue;
+			        			// var that = this;
+
+			        			console.log('filter parent:', this._filterParent);
+			        		},
+			        		scope:this
+			        	}
+
+				    },
+				    {
+				        xtype: 'rallytextfield',
+				        fieldLabel: 'Project',
+				        margin: '0 15 0 0',
+				        scope: this,
+				        listeners : {
+			        		change: function(textField, newValue, oldValue) {
+			        			this._filterProject = newValue;
+			        			// var that = this;
+
+			        			console.log('filter project:', this._filterProject);
+			        		},
+			        		scope:this
+			        	}
+				    },
+				    {
+				        xtype: 'rallybutton',
+				        text: 'Apply Filter',
+				        margin: '0 15 0 0',
+				        scope: this,
+				        handler: function() {
+			        		console.log('Apply filter');
+			        		this._doSearch(this._selectedMilestones);
+			        	}
+				    }]
 				}]
 			}]
 		},
@@ -164,6 +248,60 @@ Ext.define('CustomApp', {
 		}]);
 	},
 
+
+	_blockFilters: function() {
+		this.down('#header').disable();
+	},
+
+
+	_unBlockFilters: function() {
+		this.down('#header').enable();
+	},
+
+
+	_hideExtraFilters: function() {
+		this.down('#extraFiltersPanel').hide();
+	},
+
+
+	_showExtraFilters: function() {
+		this.down('#extraFiltersPanel').show();
+	},
+
+
+	_doSearch: function(milestones) {
+		this.setLoading();
+		this.down('#bodyContainer').removeAll(true);
+
+		this._exportData = new Ext.util.MixedCollection();
+
+		var promises = [];
+		for (var m of milestones) {
+			promises.push(this._buildMilestoneColumn(m));
+		}
+
+
+		Deft.Promise.all(promises).then({
+			success: function(records) {
+				this.setLoading(false);
+
+				var rows = this._convertExportDataToJson(this._exportData);
+
+
+				if (!this._exportButton) {
+					this._exportButton = this._createExportButton(rows);
+		        	this.down('#header').add(this._exportButton);
+				} else {
+					this.down('#header').remove(this._exportButton);
+					this._exportButton = this._createExportButton(rows);
+		        	this.down('#header').add(this._exportButton);
+				}                             
+            },
+            scope: this
+		});
+		//this._setFilter(combo.value);
+		//this._buildSummaryBoard(milestones);
+	},
 
 
 	_createExportButton: function(rows) {
@@ -351,6 +489,58 @@ Ext.define('CustomApp', {
 			operator: 'contains',
 			value: milestoneTag
 		};
+
+		var boxExtraFilter = this.down('#extraFilters');
+		if (boxExtraFilter.value) {
+			console.log('using extraFilters');
+
+			if (this._filterPlannedStartDate) {
+				filter = Rally.data.QueryFilter.and([
+						filter,
+					{
+						property: 'PlannedStartDate',
+						operator: '>=',
+						value: this._filterPlannedStartDate
+					}
+				]);
+			}
+
+			if (this._filterPlannedEndDate) {
+				filter = Rally.data.QueryFilter.and([
+						filter,
+					{
+						property: 'PlannedEndDate',
+						operator: '<=',
+						value: this._filterPlannedEndDate
+					}
+				]);
+			}
+
+
+			if (this._filterProject) {
+				filter = Rally.data.QueryFilter.and([
+						filter,
+					{
+						property: 'Project.Name',
+						value: this._filterProject
+					}
+				]);
+			}
+
+			if (this._filterParent) {
+				filter = Rally.data.QueryFilter.and([
+						filter,
+					{
+						property: 'Parent.Name',
+						value: this._filterParent
+					}
+				]);
+			}
+		}
+		
+
+		console.log('filter:', filter);
+
 
 		var featureStore = Ext.create('Rally.data.wsapi.artifact.Store', {
 			context: {
