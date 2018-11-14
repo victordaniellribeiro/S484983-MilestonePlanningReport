@@ -556,6 +556,7 @@ Ext.define('CustomApp', {
 					'Project', 
 					'State', 
 					'Type', 
+					'Tags', 
 					'PlanEstimate',
 					'PreliminaryEstimateValue',
 					'LeafStoryPlanEstimateTotal', 
