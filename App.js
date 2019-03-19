@@ -58,7 +58,7 @@ Ext.define('CustomApp', {
 					console.log('change: ', combo.getValue());
 					//console.log('store', this._milestoneComboStore);
 
-					if (combo.getValue() && combo.getValue() != '' && combo.valueModels.length > 0) {
+					if (combo.getValue() && combo.getValue() !== '' && combo.valueModels.length > 0) {
 						var milestones = combo.valueModels;
 						milestones.sort(
 							function(a, b) {
@@ -557,11 +557,15 @@ Ext.define('CustomApp', {
 					'State', 
 					'Type', 
 					'Tags', 
+					'Parent',
+					'Requirement',
 					'PlanEstimate',
 					'PreliminaryEstimateValue',
 					'LeafStoryPlanEstimateTotal', 
 					'PercentDoneByStoryCount', 
-					'PercentDoneByStoryPlanEstimate'],
+					'PercentDoneByStoryPlanEstimate',
+					'c_BusinessPriority',
+					'WSJFScore'],
 			filters: [
 				filter
 			],
@@ -575,6 +579,11 @@ Ext.define('CustomApp', {
 				var that = this;
 
 				if (records) {
+					var bpSorter = this._createBPColumnSorter(colId);
+					column.add(bpSorter);
+					var wsjfSorter = this._createWSJFColumnSorter(colId);
+					column.add(wsjfSorter);
+
 					var summaryCard = this._buildSummaryCard(milestoneName, records);
 					column.add(summaryCard);
 
@@ -589,16 +598,28 @@ Ext.define('CustomApp', {
 						column.add(that._buildKanbanCard(feature));
 
 						var planEstimate;
+						var parent;
+						var preliminaryEstimateValue;
+
 						if (feature.get('_type') == 'portfolioitem/feature') {
 							planEstimate = feature.get('LeafStoryPlanEstimateTotal');
+							parent = feature.get('Parent').Name;
+							preliminaryEstimateValue = feature.get('PreliminaryEstimateValue');
 						} else {
 							planEstimate = feature.get('PlanEstimate');
+							parent = feature.get('Requirement') ? feature.get('Requirement').Name : '';
+							preliminaryEstimateValue = '';
 						}
 
 						var featureExp = {
 							id : feature.get('FormattedID'),
 							description : feature.get('Name'),
-							planEstimate : planEstimate
+							planEstimate : planEstimate,
+							parent: parent,
+							project: feature.get('Project').Name,
+							score: feature.get('WSJFScore'),
+							businessPriority: feature.get('c_BusinessPriority'),
+							preliminaryEstimateValue: preliminaryEstimateValue
 						};
 
 						exportFeature.featuresArray.push(featureExp);
@@ -619,6 +640,180 @@ Ext.define('CustomApp', {
 		this.down('#bodyContainer').add(column);
 
 		return deferred.promise;
+	},
+
+
+	_createBPColumnSorter: function(colId) {
+		var lbl2 = new Ext.panel.Panel({
+			width: 110,
+			height: 22,
+			id: colId + "sorter1",
+			html: "Business Priority",
+			baseCls: "custom-cursor",
+			order: true,
+			listeners: {
+				render: function(c) {
+					c.getEl().on({
+						click: function() {
+							var panel = Ext.ComponentQuery.query('#'+colId)[0];
+
+							var sortedItems = this._sortItemsByBusinessPriority(panel.items, c.order);
+							c.order = !c.order;
+
+							var sorter1 = panel.items.getAt(0); 
+							var sorter2 = panel.items.getAt(1); 
+							var summary = panel.items.getAt(2); 
+							panel.removeAll(false);
+
+
+							panel.add(sorter1);
+							panel.add(sorter2);
+							panel.add(summary);
+
+							panel.add(sortedItems);
+
+							panel.doLayout();
+						},
+						scope: this
+					});
+				},
+				scope:this
+			}
+		});
+
+		return lbl2;
+	},
+
+
+	_sortItemsByBusinessPriority: function(items, order) {
+		var sortedItems;
+		var unsortedItems = [];
+
+		//console.log('items:', order, items);
+
+		//start at 3 for the 2 sorters plus the summary box
+		for (var i = 3; i < items.length; i++) {
+			//pushing all cards to an array
+			unsortedItems.push(items.getAt(i));
+		}
+
+		if (order) {
+			sortedItems = unsortedItems.sort( function(a,b) {
+				var itema = a.getRecord().get('c_BusinessPriority');
+				var itemb = b.getRecord().get('c_BusinessPriority');
+
+				if (itema < itemb) {
+					return -1;
+				} else if (itema > itemb) {
+					return 1;
+				} else {
+					return 0;
+				}
+			});
+		} else {
+			sortedItems = unsortedItems.sort( function(a,b) {
+				var itema = a.getRecord().get('c_BusinessPriority');
+				var itemb = b.getRecord().get('c_BusinessPriority');
+
+				if (itema > itemb) {
+					return -1;
+				} else if (itema < itemb) {
+					return 1;
+				} else {
+					return 0;
+				}
+			});
+		}
+
+		//console.log('sorted:', sortedItems);
+		return sortedItems;
+	},
+
+
+	_createWSJFColumnSorter: function(colId) {
+		var lbl2 = new Ext.panel.Panel({
+			width: 40,
+			height: 22,
+			id: colId + "sorter2",
+			html: "WSJF",
+			baseCls: "custom-cursor",
+			order: true,		
+			listeners: {
+				render: function(c) {
+					c.getEl().on({
+						click: function() {
+							var panel = Ext.ComponentQuery.query('#'+colId)[0];
+
+							var sortedItems = this._sortItemsByWSJFScore(panel.items, c.order);
+							c.order = !c.order;
+
+							var sorter1 = panel.items.getAt(0); 
+							var sorter2 = panel.items.getAt(1); 
+							var summary = panel.items.getAt(2); 
+							panel.removeAll(false);
+
+
+							panel.add(sorter1);
+							panel.add(sorter2);
+							panel.add(summary);
+
+							panel.add(sortedItems);
+
+							panel.doLayout();
+						},
+						scope: this
+					});
+				},
+				scope:this
+			}
+		});
+
+		return lbl2;
+	},
+
+
+	_sortItemsByWSJFScore: function(items, order) {
+		var sortedItems;
+		var unsortedItems = [];
+
+		//console.log('items:', order, items);
+
+		//start at 3 for the 2 sorters plus the summary box
+		for (var i = 3; i < items.length; i++) {
+			//pushing all cards to an array
+			unsortedItems.push(items.getAt(i));
+		}
+
+		if (order) {
+			sortedItems = unsortedItems.sort( function(a,b) {
+				var itema = a.getRecord().get('WSJFScore');
+				var itemb = b.getRecord().get('WSJFScore');
+
+				if (itema < itemb) {
+					return -1;
+				} else if (itema > itemb) {
+					return 1;
+				} else {
+					return 0;
+				}
+			});
+		} else {
+			sortedItems = unsortedItems.sort( function(a,b) {
+				var itema = a.getRecord().get('WSJFScore');
+				var itemb = b.getRecord().get('WSJFScore');
+
+				if (itema > itemb) {
+					return -1;
+				} else if (itema < itemb) {
+					return 1;
+				} else {
+					return 0;
+				}
+			});
+		}
+
+		//console.log('sorted:', sortedItems);
+		return sortedItems;
 	},
 
 
@@ -668,7 +863,9 @@ Ext.define('CustomApp', {
 				'Project',
 				'Parent',
 				'LeafStoryPlanEstimateTotal',
-				'PercentDoneByStoryPlanEstimate'
+				'PercentDoneByStoryPlanEstimate',
+				'c_BusinessPriority',
+				'WSJFScore'
 			],
 			width: 280,
 			record: record
@@ -844,7 +1041,12 @@ Ext.define('CustomApp', {
 	    			milestoneName: milestoneName,
 	    			featureNumber: feature.id,
 	    			featureDescription: feature.description,
-	    			planEstimate: feature.planEstimate
+	    			planEstimate: feature.planEstimate,
+	    			parent: feature.parent,
+	    			project: feature.project,
+	    			score: feature.score,
+	    			businessPriority: feature.businessPriority,
+	    			preliminaryEstimateValue: feature.preliminaryEstimateValue
 	    		});
     		}, this);          
         }, 
