@@ -58,7 +58,7 @@ Ext.define('CustomApp', {
 					console.log('change: ', combo.getValue());
 					//console.log('store', this._milestoneComboStore);
 
-					if (combo.getValue() && combo.getValue() !== '' && combo.valueModels.length > 0) {
+					if (combo.getValue() && combo.getValue() != '' && combo.valueModels.length > 0) {
 						var milestones = combo.valueModels;
 						milestones.sort(
 							function(a, b) {
