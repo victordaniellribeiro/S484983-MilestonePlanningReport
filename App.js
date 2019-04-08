@@ -11,6 +11,7 @@ Ext.define('CustomApp', {
     _types:['PortfolioItem/Feature'],
     _initDate: undefined,
     _endDate: undefined,
+    _milestoneType: undefined,
     _selectedMilestones: undefined,
     _filterPlannedStartDate: undefined,
     _filterPlannedEndDate: undefined,
@@ -18,6 +19,7 @@ Ext.define('CustomApp', {
     _filterProject: undefined,
     _exportData: undefined,
     _exportButton: undefined,
+    _projectStore: undefined,
 
     _myMask: undefined,
 
@@ -43,10 +45,74 @@ Ext.define('CustomApp', {
 	launch: function() {
 		var context = this.getContext();
 		var project = context.getProject()['ObjectID'];
-		this.projectId = project;
-		this._milestoneComboStore = undefined;		
-
 		console.log('project:', project);
+
+		this.projectId = project;
+
+
+		var projectStore = Ext.create('Rally.data.WsapiDataStore',{
+	        model: 'Project',
+	        limit : Infinity,
+	        fetch: ['Name','ObjectID'],
+	        autoLoad: true,
+            sorters: [{
+                property: 'Name',
+                direction: 'ASC'
+            }],
+	        filters: 
+	        	Rally.data.QueryFilter.or([
+	        		{
+                        property: 'Parent.ObjectID',
+                        value: project
+                    },
+	                Rally.data.QueryFilter.or([
+	                    {
+	                        property: 'Parent.parent.ObjectID',
+	                        value: project
+	                    },
+	                    {
+	                        property: 'Parent.parent.parent.ObjectID',
+	                        value: project
+	                    }   
+	                ])
+                ]),
+
+	        listeners:{
+	            load: function(store,records,success) {
+	            	console.log('projects', records);
+
+	            	var localRecords = [];
+	            	localRecords.push({
+                    	_refName: '-- No Entry --',
+                    	Name: ''
+                    });
+
+	            	_.each(records, function(project) {
+                        localRecords.push({
+                        	_refName: project.get('Name'),
+                        	Name: project.get('Name')
+                        });
+                    });
+
+                    var customProjectStore = Ext.create('Ext.data.Store', {
+			    		fields: ['_refName', 'Name'],
+					    data : localRecords
+					});
+
+                    console.log('projectStore:', customProjectStore);
+
+	                this._updateCombo(customProjectStore);
+	                this._buildGrid();
+	            },
+	            scope: this
+	        }
+    	});		
+	},
+
+
+
+	_buildGrid: function() {
+		this._milestoneComboStore = undefined;
 		this._milestoneCombo = Ext.widget('rallymilestonecombobox', {
 			itemId: 'milestonecombobox',
 			allowClear: true,
@@ -138,6 +204,23 @@ Ext.define('CustomApp', {
 		        		},
 		        		scope:this
 		        	}
+				}, {					
+			        xtype: 'rallyfieldvaluecombobox',
+			        fieldLabel: 'Milestone Types',
+			        model: 'Milestone',
+			        field: 'c_Type',
+			        scope: this,
+			        listeners: {
+			        	change: function(combo) {
+							console.log('Milestone type: ', combo.getValue());
+							//console.log('store', this._milestoneComboStore);
+
+							this._milestoneType = combo.getValue();
+
+							this._applyMilestoneRangeFilter(this._initDate, this._endDate, this._milestoneComboStore, this, this._milestoneType);
+						},
+						scope: this
+			        }
 				},
 				{
 					xtype: 'rallycheckboxfield',
@@ -209,20 +292,24 @@ Ext.define('CustomApp', {
 			        	}
 
 				    },
-				    {
-				        xtype: 'rallytextfield',
+				    {	
+				    	xtype: 'combobox',
 				        fieldLabel: 'Project',
+				        store: this._projectStore,
+				        queryMode: 'local',
+				        displayField: '_refName',
+				        valueField: 'Name',
 				        margin: '0 15 0 0',
-				        scope: this,
-				        listeners : {
-			        		change: function(textField, newValue, oldValue) {
-			        			this._filterProject = newValue;
-			        			// var that = this;
-
-			        			console.log('filter project:', this._filterProject);
-			        		},
-			        		scope:this
-			        	}
+				        anyMatch: true,
+				        listeners: {
+				            select: function(combo,records){
+				                //console.log(records[0]["data"]["Name"]);
+				                console.log('project: ', combo.getValue());
+				                this._filterProject = combo.getValue();
+				            },
+				        	scope:this
+				        },
+				        scope:this
 				    },
 				    {
 				        xtype: 'rallybutton',
@@ -230,8 +317,10 @@ Ext.define('CustomApp', {
 				        margin: '0 15 0 0',
 				        scope: this,
 				        handler: function() {
-			        		console.log('Apply filter');
-			        		this._doSearch(this._selectedMilestones);
+			        		console.log('Apply filter', this._selectedMilestones);
+			        		if (this._selectedMilestones) {
+			        			this._doSearch(this._selectedMilestones);
+			        		}
 			        	}
 				    }]
 				}]
@@ -247,6 +336,7 @@ Ext.define('CustomApp', {
 			]
 		}]);
 	},
+
 
 
 	_blockFilters: function() {
@@ -266,6 +356,13 @@ Ext.define('CustomApp', {
 
 	_showExtraFilters: function() {
 		this.down('#extraFiltersPanel').show();
+	},
+
+
+	_updateCombo: function(myStore){
+    	if (this._projectStore === undefined){
+	        this._projectStore = myStore;
+	    }
 	},
 
 
@@ -330,9 +427,9 @@ Ext.define('CustomApp', {
 	},
 
 
-	_applyMilestoneRangeFilter: function(initDate, endDate, store, scope) {
+	_applyMilestoneRangeFilter: function(initDate, endDate, store, scope, milestoneType) {
 		//console.log(initDate, endDate, store, scope);
-		if (initDate && !endDate) {
+		if (initDate && !endDate && !milestoneType) {
 			this._milestoneComboStore.filterBy(function(record) {
 				if (record.get('TargetDate')) {
 					if (record.get('TargetDate').getTime() > initDate.getTime()) {
@@ -341,7 +438,7 @@ Ext.define('CustomApp', {
 				}
 			}, scope);
 
-		} else if (endDate && !initDate) {
+		} else if (endDate && !initDate && !milestoneType) {
 			this._milestoneComboStore.filterBy(function(record) {
 				if (record.get('TargetDate')) {
 					if (record.get('TargetDate').getTime() < endDate.getTime()) {
@@ -349,11 +446,35 @@ Ext.define('CustomApp', {
 					}
 				}
 			}, scope);
-		} else if (initDate && endDate) {
+		} else if (initDate && endDate && !milestoneType) {
 			this._milestoneComboStore.filterBy(function(record) {
 				if (record.get('TargetDate')) {
 					if ((record.get('TargetDate').getTime() > initDate.getTime()) && 
 						(record.get('TargetDate').getTime() < endDate.getTime())) {
+						return record;
+					}
+				}
+			}, scope);
+		} else if (initDate && !endDate && milestoneType) {
+			this._milestoneComboStore.filterBy(function(record) {
+				if (record.get('TargetDate')) {
+					if (record.get('TargetDate').getTime() > initDate.getTime() &&
+						(record.get('c_Type') === this._milestoneType)) {
+						return record;
+					}
+				}
+			}, scope);
+		} else if (!initDate && !endDate && milestoneType) {
+			this._milestoneComboStore.filterBy(function(record) {
+				if (record.get('c_Type') && (record.get('c_Type') === this._milestoneType) ) {
+					return record;
+				}
+			}, scope);
+		} else if (endDate && !initDate && milestoneType) {
+			this._milestoneComboStore.filterBy(function(record) {
+				if (record.get('TargetDate')) {
+					if (record.get('TargetDate').getTime() < endDate.getTime() &&
+						(record.get('c_Type') === this._milestoneType)) {
 						return record;
 					}
 				}
@@ -363,7 +484,6 @@ Ext.define('CustomApp', {
 				return record;
 			});
 		}
-
 	},
 
 
@@ -532,6 +652,7 @@ Ext.define('CustomApp', {
 						filter,
 					{
 						property: 'Parent.Name',
+						operator: 'contains',
 						value: this._filterParent
 					}
 				]);
@@ -565,6 +686,7 @@ Ext.define('CustomApp', {
 					'PercentDoneByStoryCount', 
 					'PercentDoneByStoryPlanEstimate',
 					'c_BusinessPriority',
+					'DisplayColor',
 					'WSJFScore'],
 			filters: [
 				filter
@@ -575,7 +697,7 @@ Ext.define('CustomApp', {
 
 		featureStore.load().then({
 			success: function(records) {
-				//console.log('records', records);
+				console.log('records', records);
 				var that = this;
 
 				if (records) {
