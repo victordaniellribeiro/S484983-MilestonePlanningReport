@@ -770,7 +770,7 @@ Ext.define('CustomApp', {
 			width: 110,
 			height: 22,
 			id: colId + "sorter1",
-			html: "Business Priority",
+			html: "Business Priority &#x2B06;&#x2B07; ",
 			baseCls: "custom-cursor",
 			order: true,
 			listeners: {
@@ -799,6 +799,18 @@ Ext.define('CustomApp', {
 						scope: this
 					});
 				},
+				afterrender: function(){
+                   Ext.QuickTips.init();
+                   Ext.QuickTips.register({
+                     target: colId + "sorter1",
+                     text: 'Sort cards based on Business Priority',
+                     width: 240,
+                     dismissDelay: 2000
+                   }) ;
+                },
+                destroy:function(){
+                   Ext.QuickTips.destroy();
+                },
 				scope:this
 			}
 		});
@@ -854,10 +866,10 @@ Ext.define('CustomApp', {
 
 	_createWSJFColumnSorter: function(colId) {
 		var lbl2 = new Ext.panel.Panel({
-			width: 40,
+			width: 45,
 			height: 22,
 			id: colId + "sorter2",
-			html: "WSJF",
+			html: "WSJF &#x2B06;&#x2B07;",
 			baseCls: "custom-cursor",
 			order: true,		
 			listeners: {
@@ -886,6 +898,18 @@ Ext.define('CustomApp', {
 						scope: this
 					});
 				},
+				afterrender: function(){
+                   Ext.QuickTips.init();
+                   Ext.QuickTips.register({
+                     target: colId + "sorter2",
+                     text: 'Sort cards based on WSJF',
+                     width: 180,
+                     dismissDelay: 2000
+                   }) ;
+                },
+                destroy:function(){
+                   Ext.QuickTips.destroy();
+                },
 				scope:this
 			}
 		});

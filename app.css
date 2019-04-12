@@ -5,11 +5,18 @@
 .custom-cursor {
 	/*background-image: url(images/grid/grid3-hd-btn.gif);*/
 	/*background-position: 95px center;*/
-	background-image: url(images/grid/sort-desc-triangle.png);
+	/*background-image: url(images/grid/sort-desc-triangle.png);*/
 	background-position: right center;
 	background-repeat: no-repeat;
 	float: left;
 	position: static !important;
 	margin: 0px 0px 0px 50px !important;
 
+}
+
+.custom-cursor-body {
+	border-width: 1px;
+	border-style: solid;
+	border-radius: 2px;
+	background-color: #fafafa;
 }

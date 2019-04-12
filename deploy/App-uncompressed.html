@@ -779,7 +779,7 @@
 			width: 110,
 			height: 22,
 			id: colId + "sorter1",
-			html: "Business Priority",
+			html: "Business Priority &#x2B06;&#x2B07; ",
 			baseCls: "custom-cursor",
 			order: true,
 			listeners: {
@@ -808,6 +808,18 @@
 						scope: this
 					});
 				},
+				afterrender: function(){
+                   Ext.QuickTips.init();
+                   Ext.QuickTips.register({
+                     target: colId + "sorter1",
+                     text: 'Sort cards based on Business Priority',
+                     width: 240,
+                     dismissDelay: 2000
+                   }) ;
+                },
+                destroy:function(){
+                   Ext.QuickTips.destroy();
+                },
 				scope:this
 			}
 		});
@@ -863,10 +875,10 @@
 
 	_createWSJFColumnSorter: function(colId) {
 		var lbl2 = new Ext.panel.Panel({
-			width: 40,
+			width: 45,
 			height: 22,
 			id: colId + "sorter2",
-			html: "WSJF",
+			html: "WSJF &#x2B06;&#x2B07;",
 			baseCls: "custom-cursor",
 			order: true,		
 			listeners: {
@@ -895,6 +907,18 @@
 						scope: this
 					});
 				},
+				afterrender: function(){
+                   Ext.QuickTips.init();
+                   Ext.QuickTips.register({
+                     target: colId + "sorter2",
+                     text: 'Sort cards based on WSJF',
+                     width: 180,
+                     dismissDelay: 2000
+                   }) ;
+                },
+                destroy:function(){
+                   Ext.QuickTips.destroy();
+                },
 				scope:this
 			}
 		});
@@ -1210,12 +1234,18 @@
 .custom-cursor {
   /*background-image: url(images/grid/grid3-hd-btn.gif);*/
   /*background-position: 95px center;*/
-  background-image: url(images/grid/sort-desc-triangle.png);
+  /*background-image: url(images/grid/sort-desc-triangle.png);*/
   background-position: right center;
   background-repeat: no-repeat;
   float: left;
   position: static !important;
   margin: 0px 0px 0px 50px !important;
+}
+.custom-cursor-body {
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 2px;
+  background-color: #fafafa;
 }
 
     </style>
