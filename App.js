@@ -16,6 +16,7 @@ Ext.define('CustomApp', {
     _filterPlannedStartDate: undefined,
     _filterPlannedEndDate: undefined,
     _filterParent: undefined,
+    _filterParentFormattedID: undefined,
     _filterProject: undefined,
     _exportData: undefined,
     _exportButton: undefined,
@@ -287,6 +288,22 @@ Ext.define('CustomApp', {
 			        			// var that = this;
 
 			        			console.log('filter parent:', this._filterParent);
+			        		},
+			        		scope:this
+			        	}
+
+				    },
+				    {
+				        xtype: 'rallytextfield',
+				        fieldLabel: 'Parent ID',
+				        margin: '0 15 0 0',
+				        scope: this,
+				        listeners : {
+			        		change: function(textField, newValue, oldValue) {
+			        			this._filterParentFormattedID = newValue;
+			        			// var that = this;
+
+			        			console.log('filter parent FormattedID:', this._filterParentFormattedID);
 			        		},
 			        		scope:this
 			        	}
@@ -654,6 +671,17 @@ Ext.define('CustomApp', {
 						property: 'Parent.Name',
 						operator: 'contains',
 						value: this._filterParent
+					}
+				]);
+			}
+
+			if (this._filterParentFormattedID) {
+				filter = Rally.data.QueryFilter.and([
+						filter,
+					{
+						property: 'Parent.FormattedID',
+						operator: '=',
+						value: this._filterParentFormattedID
 					}
 				]);
 			}
