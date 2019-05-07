@@ -120,6 +120,24 @@ Ext.define('CustomApp', {
 			multiSelect: true,
 			width: 300,
 			listeners: {
+				afterrender: function(combobox) {
+					combobox.disable();
+				},
+				beforerender: function(combo) {
+					console.log('beforerender: ', combo);
+					this._blockFilters();
+
+					//console.log('store', this._milestoneComboStore);
+					//this._setFilter(combo.value);
+				},
+				ready: function(combo) {
+					console.log('ready: ', combo.value);
+					this._unBlockFilters();
+					combo.refreshStore();
+					combo.enable();
+					//console.log('store', this._milestoneComboStore);
+					//this._setFilter(combo.value);
+				},
 				change: function(combo) {
 					//console.log('change: ', combo);
 					console.log('change: ', combo.getValue());
@@ -139,19 +157,6 @@ Ext.define('CustomApp', {
 					} else {
 						this._applyMilestoneRangeFilter(this._initDate, this._endDate, this._milestoneComboStore, this);
 					}
-				},
-				beforerender: function(combo) {
-					console.log('beforerender: ', combo);
-					this._blockFilters();
-
-					//console.log('store', this._milestoneComboStore);
-					//this._setFilter(combo.value);
-				},
-				ready: function(combo) {
-					console.log('ready: ', combo.value);
-					this._unBlockFilters();
-					//console.log('store', this._milestoneComboStore);
-					//this._setFilter(combo.value);
 				},
 				scope: this
 			}
@@ -481,16 +486,26 @@ Ext.define('CustomApp', {
 					}
 				}
 			}, scope);
+		} else if (!initDate && endDate && milestoneType) {
+			this._milestoneComboStore.filterBy(function(record) {
+				if (record.get('TargetDate')) {
+					if (record.get('TargetDate').getTime() < initDate.getTime() &&
+						(record.get('c_Type') === this._milestoneType)) {
+						return record;
+					}
+				}
+			}, scope);
 		} else if (!initDate && !endDate && milestoneType) {
 			this._milestoneComboStore.filterBy(function(record) {
 				if (record.get('c_Type') && (record.get('c_Type') === this._milestoneType) ) {
 					return record;
 				}
 			}, scope);
-		} else if (endDate && !initDate && milestoneType) {
+		} else if (endDate && initDate && milestoneType) {
 			this._milestoneComboStore.filterBy(function(record) {
 				if (record.get('TargetDate')) {
 					if (record.get('TargetDate').getTime() < endDate.getTime() &&
+						(record.get('TargetDate').getTime() > initDate.getTime()) &&
 						(record.get('c_Type') === this._milestoneType)) {
 						return record;
 					}
