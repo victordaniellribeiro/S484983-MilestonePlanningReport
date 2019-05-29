@@ -118,6 +118,7 @@ Ext.define('CustomApp', {
 			itemId: 'milestonecombobox',
 			allowClear: true,
 			multiSelect: true,
+			queryMode: 'local',
 			width: 300,
 			listeners: {
 				afterrender: function(combobox) {
